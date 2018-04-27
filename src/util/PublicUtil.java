@@ -3,18 +3,20 @@ package util;
 import org.apache.log4j.Logger;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
+import org.dom4j.DocumentHelper;
 import org.dom4j.Element;
 import org.dom4j.io.OutputFormat;
 import org.dom4j.io.SAXReader;
 import org.dom4j.io.XMLWriter;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStream;
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.JAXBException;
+import javax.xml.bind.Unmarshaller;
+import java.io.*;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -186,21 +188,23 @@ public class PublicUtil {
         return true;
     }
 
-    public static boolean getProcessStatusByProcessID(int processId){
-        String sql = "select status from pd_processInfo where processId = " + processId;
+    public static boolean getProcessStatusByOrderId(String orderId){
+        String sql = "select status from PD_ProcessInfo where orderId = '" + orderId+"'";
         Connection conn = PoolConnection.getConnection();
         PreparedStatement pst = null;
         ResultSet rs = null;
         String status = null;
         boolean flag = false;
         try {
+            System.out.println(sql);
             pst = conn.prepareStatement(sql);
             rs = pst.executeQuery();
             while (rs.next()) {
                 status = rs.getString("status");
             }
+
             //如果不是这两种状态则为false
-            if("Completed".contains(status) || "Aborted".contains(status)) {
+            if(status!=null&&("Completed".contains(status) || "Aborted".contains(status))) {
                 flag = true;
             } else {
                 flag = false;
@@ -213,6 +217,33 @@ public class PublicUtil {
             return flag;
         }
     }
+
+    /**
+     * 根据插件名称取出订单模板
+     * @param orderName
+     * @return
+     */
+    public static String getXMLByOrderName(String orderName){
+        String xmlStr = null;
+
+        String sql = "select TemplateXml from PluginInfo where PluginName = '"+orderName+"'";
+
+        Connection conn = PoolConnection.getConnection();
+        PreparedStatement pst = null;
+        ResultSet rs = null;
+        try {
+            pst = conn.prepareStatement(sql);
+            rs = pst.executeQuery();
+            while (rs.next()){
+                xmlStr = rs.getString("TemplateXml");
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+
+        return xmlStr;
+    }
+
 
     public static Document getDocByFilePath(String filePath){
         SAXReader reader = new SAXReader();

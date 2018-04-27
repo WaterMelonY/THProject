@@ -4,6 +4,8 @@ import org.apache.log4j.Logger;
 import org.dom4j.Document;
 import org.dom4j.DocumentHelper;
 import org.dom4j.Element;
+
+import redis.clients.jedis.Jedis;
 import util.PublicUtil;
 import util.RedisUtil;
 
@@ -16,8 +18,8 @@ import java.util.TimerTask;
  * Created by WaterMelon on 2018/4/19.
  */
 public class processFirst {
-    private String processName = "ThSegmentProcess";
-    private String taskName = "THduanInfo";
+    private String processName = "THSegmentProcess";
+    private String taskName = "THSegmentOrder";
 
     private String processParam = "";
 
@@ -33,23 +35,26 @@ public class processFirst {
 
         Document doc = DocumentHelper.createDocument();
 
+        String orderId = processName+time;
+        String taskId = taskName+time;
+
         //填充模板内容
         Element root = doc.addElement("process-order").addAttribute("id", processName+time).addAttribute("name", processName)
                 .addAttribute("priority", "1");
 
         Element task = root.addElement("task");
-        task.addAttribute("orderid","orderid");
-        task.addAttribute("priority","2");
-        task.addAttribute("id","taskid");
-        task.addAttribute("name","TASK");
+        task.addAttribute("orderid",processName+time);
+        task.addAttribute("priority","1");
+        task.addAttribute("id",taskName+time);
+        task.addAttribute("name",taskName);
 
         Element inputfilelist = task.addElement("inputfilelist");
-        inputfilelist.addAttribute("num","1").addElement("10Data").setText("");
-        inputfilelist.setText("");
+        inputfilelist.addAttribute("num","1").addElement("l0Data").setText("test10Data");
+//        inputfilelist.setText("testInputfilelist");
 
         Element outputfilelist = task.addElement("outputfilelist");
-        outputfilelist.addAttribute("num","2").addElement("reportFile").setText("D:\\ThFileSave\\JB13A-1\\2015\\0729\\368_1406050001\\taskid.report.xml");
-        outputfilelist.addElement("resultFile").setText("D:\\ThFileSave\\JB13A-1\\2015\\0729\\368_1406050001\\taskid.result.xml");
+        outputfilelist.addAttribute("num","2").addElement("reportFile").setText("/DiskArray/iecas/root/dpps/meta/2018/0427/"+taskId+".report.xml");
+        outputfilelist.addElement("resultFile").setText("/DiskArray/iecas/root/dpps/meta/2018/0427/"+taskId+".result.xml");
 //        outputfilelist.setText("");
 
         Element params = task.addElement("params");
@@ -59,11 +64,21 @@ public class processFirst {
         params.addElement("pbtaskid").setText("1111");
         params.addElement("sensor").setText("SAT");
         params.addElement("segmentIDPrefix").setText("JB13A-1_SAR_000000368");
-        params.addElement("segmentDirRoot").setText("D:\\ThFileSave\\JB13A-1\\2015\\0729\\");
+        params.addElement("segmentDirRoot").setText("/DiskArray/iecas/root/Output/BM/ZY3-02/BM_4656_Product/ZY3/MUX/");
         params.addElement("server_address").setText("127.0.0.1");
         params.addElement("server_port").setText("11111");
+//        System.out.println(doc.asXML());
+        PublicUtil.outputXml(doc,"D:\\CH\\testXml\\Process\\"+taskId+".xml");
         //提交到redis中。
-        RedisUtil.submit(doc.asXML());
+        String redisIP = "172.24.10.161";
+        int redisPort = 8715;
+        int intervalTime = 6000;
+        Jedis redis = new Jedis(redisIP, redisPort, intervalTime);
+        redis.rpush("dpps:queue:order", doc.asXML());
+        redis.close();
+
+        //将传输结束通知信息入库。
+
         //检测模板完成情况 定时器查询pd_processInfo--->status
         Timer timer = new Timer();
         timer.schedule(new TimerTask() {
@@ -73,11 +88,11 @@ public class processFirst {
             @Override
             public void run() {
 
-                if(log.isDebugEnabled())
+                if(log.isInfoEnabled())
                     log.debug("当前已扫描：" + i + "周");
 
                 //查询数据库 看当前id 对应的状态
-                if(PublicUtil.getProcessStatusByProcessID(1)) {
+                if(PublicUtil.getProcessStatusByOrderId(orderId)) {
 
                     timer.cancel();
 
@@ -85,6 +100,7 @@ public class processFirst {
                     //开启下一个流程 ， 代码后期优化，使用递归模式进行调用。
 //                    startSenceProcess(reportFilePath);
                     new processSecond().createSceneOrder(reportFilePath);
+//                    System.out.println("我要开启下一个流程");
                 }
 
                 //如果超过四次没通过 停止

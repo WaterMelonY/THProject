@@ -8,6 +8,7 @@ import org.dom4j.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 import util.PublicUtil;
+import util.RedisUtil;
 
 
 import javax.xml.parsers.DocumentBuilder;
@@ -25,12 +26,17 @@ public class processSecond {
 
     private static Logger log = Logger.getLogger(processSecond.class);
 
+    private final static String PROCESS_SCENE = "THSceneProcess";
+    private final static String TASK_SCENE = "THSceneOrder";
+
+    private final static String TASK_PROCESS_SCENE_DATA = "THSegmentData";
+
     /**
      * 根据分段订单xml启动分景流程
      * @param reportFilePath
      * @return
      */
-    public String createSceneOrder(String reportFilePath){
+    public void createSceneOrder(String reportFilePath){
         String returnStr = "";
 
         //读取分段订单xml中的 segment 中为success的进行分景流程
@@ -43,91 +49,46 @@ public class processSecond {
             Element segment = (Element) it.next();
             String status = segment.element("status").getStringValue();
             if("SUCCESS".equals(status.toUpperCase())){
+//                new Thread(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        //拼接xml然后提交到redis //然后提交到redis中
+//                        createDoc(document);
+//                    }
+//                });
+                Date date = new Date();
+                SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMddhhmmss");
+                String time = dateFormat.format(date);
+                //拼接xml然后提交到redis //然后提交到redis中
+                new Thread(()->{
+                    createDoc(document,time);
+                });
+                new Thread(()->{
+                    xmlToData(document,time);
+                });
                 new Thread(new Runnable() {
                     @Override
                     public void run() {
-                        //拼接xml然后提交到redis
-                        createDoc(document);
+                        //数据入库xml然后进行
+
                     }
                 });
             }
         }
 
-
-//<task name="" id="" desc="" orderid="">
-//	<inputfilelist num="1">
-//		<segmentData>/DiskArray/data/catalog/JB13A-1/2015/0729/JB13A-1_SAR_000000368_001/JB13A-1_SAR_000000368_001.FRED</segmentData>
-//		<segmentXML>/DiskArray/data/catalog/JB13A-1/2015/0729/JB13A-1_SAR_000000368_001/JB13A-1_SAR_000000368_001.xml</segmentXML>
-//		<GPS>.gps.txt</GPS>
-//		<ATT_OULER>.att_ouler.txt</ATT_OULER>
-//		<ATT_FOUR>.att_four.txt</ATT_FOUR>
-//		<EPHM>.ephm.txt</EPHM>
-//	</inputfilelist>
-//	<outputfilelist num="2">
-//		<reportFile>/DiskArray/data/catalog/JB13A-1/2015/0729/JB13A-1_SAR_000000368_001/JB13A-1_SAR_000000368_001.scenes.report.xml</reportFile>
-//		<resultFile>/DiskArray/ars/meta/2015/0729/taskid.result.xml</resultFile>
-//	</outputfilelist>
-//	<params>
-//		<satelliteId>JB13A-1</satelliteId>
-//		<trplanid>368</trplanid>
-//		<sensor>SAR</sensor>
-//		<segmentID>JB13A-1_SAR_000000368_001</segmentID>
-//		<imagingMode>strip/spot/top</imagingMode>
-//		<segmentDir>/DiskArray/data/catalog/JB13A-1/2015/0729/JB13A-1_SAR_000000368_001</segmentDir>
-//	</params>
-//</task>
-
-        //然后提交到redis中
-
-        //数据入库xml然后进行
-
-        //开启监听
-        Timer timer = new Timer();
-        timer.schedule(new TimerTask() {
-
-            int i = 1;
-
-            @Override
-            public void run() {
-
-                if(log.isDebugEnabled())
-                    log.debug("当前已扫描：" + i + "周");
-
-                //查询数据库 看当前id 对应的状态
-                if(PublicUtil.getProcessStatusByProcessID(1)) {
-
-                    timer.cancel();
-
-                    String reportFilePath = "";
-                    startSceneImage(reportFilePath);
-                }
-
-                //如果超过四次没通过 停止
-                if(i == 4) {
-                    timer.cancel();
-//					if(log.isDebugEnabled())
-//						log.debug(TimeUtil.getCurDate() + ":" + processParam + "生产时间超，时定制器强制停止");
-                }
-
-                i++;
-
-            }
-            // 0：延迟次数 即从开启到执行第一次扫描的时间  period：周期 多久扫描一次
-        }, 0, 3000);
-
-        return returnStr;
     }
 
     public void startSceneImage(String reportFilePath){
 
     }
 
-    public Document createDoc(Document document){
+    public boolean createDoc(Document document,String time){
 
 
-        Date date = new Date();
-        SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMddhhmmss");
-        String time = dateFormat.format(date);
+
+
+        String orderId = PROCESS_SCENE+time;
+        String taskId = TASK_SCENE+time;
 
         Document doc = DocumentHelper.createDocument();
 
@@ -161,6 +122,73 @@ public class processSecond {
         params.addElement("server_address").setText("127.0.0.1");
         params.addElement("server_port").setText("11111");
 
-        return doc;
+        RedisUtil.submit(doc.asXML());
+
+        //开启监听
+        Timer timer = new Timer();
+        timer.schedule(new TimerTask() {
+
+            int i = 1;
+
+            @Override
+            public void run() {
+
+                if(log.isDebugEnabled())
+                    log.debug("当前已扫描：" + i + "周");
+
+                //查询数据库 看当前id 对应的状态
+                if(PublicUtil.getProcessStatusByOrderId("")) {
+
+                    timer.cancel();
+
+                    String reportFilePath = "";
+                    startSceneImage(reportFilePath);
+                }
+
+                //如果超过四次没通过 停止
+                if(i == 4) {
+                    timer.cancel();
+//					if(log.isDebugEnabled())
+//						log.debug(TimeUtil.getCurDate() + ":" + processParam + "生产时间超，时定制器强制停止");
+                }
+
+                i++;
+
+            }
+            // 0：延迟次数 即从开启到执行第一次扫描的时间  period：周期 多久扫描一次
+        }, 0, 3000);
+
+        return true;
+    }
+
+    public boolean xmlToData(Document document,String time){
+//        <?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+//<task name="" id="" desc="" orderid="">
+//	<inputfilelist num="5">
+//	    <!--段元数据文件的路径-->
+//		<segmentmetafile>/mnt/lfs/l0datatemp/JB13A-1/2015/0729/368_1507290001/368_1507290001.100001</segmentmetafile>
+//        <!--传输完成通知的路径-->
+//		<sendfin>/mnt/lfs/l0datatemp/JB13A-1/2015/0729/368_1507290001/文件名</sendfin>
+//		<!--辅助分离文件路径-->
+//		<auxfile>/mnt/lfs/l0datatemp/JB13A-1/2015/0729/368_1507290001/文件名</auxfile>
+//		<!--格式化文件路径-->
+//		<fredfile>/mnt/lfs/l0datatemp/JB13A-1/2015/0729/368_1507290001/文件名</fredfile>
+//        <!--文件大小-->
+//        <filesize>1024<filesize>
+//	</inputfilelist>
+//	<outputfilelist num="1">
+//		<resultFile>/DiskArray/ars/meta/2015/0729/taskid.result.xml</resultFile>
+//	</outputfilelist>
+//	<params>
+//		<trplanid>1234567890</trplanid>
+//	</params>
+//</task>
+        Document doc = DocumentHelper.createDocument();
+        String orderId = PROCESS_SCENE+time;
+        String taskId = TASK_PROCESS_SCENE_DATA+time;
+
+
+
+        return true;
     }
 }

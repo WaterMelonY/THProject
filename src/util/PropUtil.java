@@ -8,7 +8,7 @@ import java.util.Properties;
  */
 public class PropUtil {
 
-    private  static final String CONFIG_FILE = "scgl.properties";
+    private  static final String CONFIG_FILE = "th.properties";
     
     private Properties prop;
     
