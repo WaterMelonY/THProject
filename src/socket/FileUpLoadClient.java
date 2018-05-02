@@ -5,6 +5,7 @@ import org.apache.log4j.Logger;
 import java.io.*;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import java.util.List;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -38,6 +39,12 @@ public class FileUpLoadClient extends Socket{
             System.out.println("Cliect[port:" + client.getLocalPort() + "] 成功连接服务端");
         }else{
             System.out.println("服务器连接失败");
+        }
+    }
+
+    public void sendFiles(List<String> filePaths){
+        for (String filePath: filePaths) {
+            sendFile(filePath);
         }
     }
 

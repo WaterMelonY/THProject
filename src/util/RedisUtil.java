@@ -15,7 +15,7 @@ public final class RedisUtil {
         try {
             JedisPoolConfig jedisPoolConfig = new JedisPoolConfig();
 
-            jedisPool = new JedisPool(jedisPoolConfig, "172.24.10.161", 8175, 6000);
+            jedisPool = new JedisPool(jedisPoolConfig, "172.24.10.161", 8715, 6000);
         } catch (Exception e) {
 
             e.printStackTrace();
@@ -67,9 +67,9 @@ public final class RedisUtil {
      */
     public static void submit(String xmlStr) {
 
-        Jedis redis = new Jedis("172.24.10.161", 8175, 6000);
+        Jedis redis = new Jedis("172.24.10.161", 8715, 6000);
 //        Jedis redis = getJedis();
-        System.out.println("172.24.10.161" + ":" + 8175 + ":" + 6000);
+        System.out.println("172.24.10.161" + ":" + 8715 + ":" + 6000);
         redis.rpush("dpps:queue:order", xmlStr);
         System.out.println("执行订单提交成功");
         redis.close();

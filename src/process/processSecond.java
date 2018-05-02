@@ -9,6 +9,7 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 import util.PublicUtil;
 import util.RedisUtil;
+import util.TimeUtil;
 
 
 import javax.xml.parsers.DocumentBuilder;
@@ -66,13 +67,6 @@ public class processSecond {
                 new Thread(()->{
                     xmlToData(document,time);
                 });
-                new Thread(new Runnable() {
-                    @Override
-                    public void run() {
-                        //数据入库xml然后进行
-
-                    }
-                });
             }
         }
 
@@ -83,32 +77,30 @@ public class processSecond {
     }
 
     public boolean createDoc(Document document,String time){
-
-
-
-
         String orderId = PROCESS_SCENE+time;
         String taskId = TASK_SCENE+time;
 
         Document doc = DocumentHelper.createDocument();
 
         //填充模板内容
-        Element root = doc.addElement("process-order").addAttribute("id", time).addAttribute("name", "")
+        Element root = doc.addElement("process-order").addAttribute("id", orderId).addAttribute("name", PROCESS_SCENE)
                 .addAttribute("priority", "1");
 
         Element task = root.addElement("task");
-        task.addAttribute("orderid","orderid");
+        task.addAttribute("orderid",orderId);
         task.addAttribute("priority","2");
-        task.addAttribute("id","taskid");
-        task.addAttribute("name","TASK");
+        task.addAttribute("id",taskId);
+        task.addAttribute("name",TASK_SCENE);
 
         Element inputfilelist = task.addElement("inputfilelist");
         inputfilelist.addAttribute("num","1").addElement("10Data").setText("");
         inputfilelist.setText("");
 
         Element outputfilelist = task.addElement("outputfilelist");
-        outputfilelist.addAttribute("num","2").addElement("reportFile").setText("D:\\ThFileSave\\JB13A-1\\2015\\0729\\368_1406050001\\taskid.report.xml");
-        outputfilelist.addElement("resultFile").setText("D:\\ThFileSave\\JB13A-1\\2015\\0729\\368_1406050001\\taskid.result.xml");
+        String year = TimeUtil.getCurYear();
+        String month = TimeUtil.getCurMonth();
+        outputfilelist.addAttribute("num","2").addElement("reportFile").setText("/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+task+"/"+taskId+".report.xml");
+        outputfilelist.addElement("resultFile").setText("/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+task+"/"+taskId+".result.xml");
 //        outputfilelist.setText("");
 
         Element params = task.addElement("params");
@@ -162,31 +154,78 @@ public class processSecond {
     }
 
     public boolean xmlToData(Document document,String time){
-//        <?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
-//<task name="" id="" desc="" orderid="">
-//	<inputfilelist num="5">
-//	    <!--段元数据文件的路径-->
-//		<segmentmetafile>/mnt/lfs/l0datatemp/JB13A-1/2015/0729/368_1507290001/368_1507290001.100001</segmentmetafile>
-//        <!--传输完成通知的路径-->
-//		<sendfin>/mnt/lfs/l0datatemp/JB13A-1/2015/0729/368_1507290001/文件名</sendfin>
-//		<!--辅助分离文件路径-->
-//		<auxfile>/mnt/lfs/l0datatemp/JB13A-1/2015/0729/368_1507290001/文件名</auxfile>
-//		<!--格式化文件路径-->
-//		<fredfile>/mnt/lfs/l0datatemp/JB13A-1/2015/0729/368_1507290001/文件名</fredfile>
-//        <!--文件大小-->
-//        <filesize>1024<filesize>
-//	</inputfilelist>
-//	<outputfilelist num="1">
-//		<resultFile>/DiskArray/ars/meta/2015/0729/taskid.result.xml</resultFile>
-//	</outputfilelist>
-//	<params>
-//		<trplanid>1234567890</trplanid>
-//	</params>
-//</task>
         Document doc = DocumentHelper.createDocument();
         String orderId = PROCESS_SCENE+time;
         String taskId = TASK_PROCESS_SCENE_DATA+time;
 
+        Element root = doc.addElement("process-order").addAttribute("id", orderId).addAttribute("name", PROCESS_SCENE)
+                .addAttribute("priority", "1");
+
+        Element task = root.addElement("task");
+        task.addAttribute("orderid",orderId);
+        task.addAttribute("priority","1");
+        task.addAttribute("id",taskId);
+        task.addAttribute("name",TASK_PROCESS_SCENE_DATA);
+
+        Element inputfilelist = task.addElement("inputfilelist").addAttribute("num","5");
+        Element outputfilelist = task.addElement("outputfilelist").addAttribute("num","1");
+        Element params = task.addElement("params");
+
+        Element segmentmetafile = inputfilelist.addElement("segmentmetafile");
+        segmentmetafile.setText("");
+
+        Element sendfin = inputfilelist.addElement("sendfin");
+        sendfin.setText("");
+
+        Element auxfile = inputfilelist.addElement("auxfile");
+        auxfile.setText("");
+
+        Element fredfile = inputfilelist.addElement("fredfile");
+        fredfile.setText("");
+
+        Element filesize = inputfilelist.addElement("filesize");
+        filesize.setText("");
+
+        Element resultFile = outputfilelist.addElement("resultFile");
+        resultFile.setText("");
+
+        Element trplanid = params.addElement("trplanid");
+        trplanid.setText("");
+
+        RedisUtil.submit(doc.asXML());
+
+        Timer timer = new Timer();
+        timer.schedule(new TimerTask() {
+
+            int i = 1;
+
+            @Override
+            public void run() {
+
+                if(log.isDebugEnabled())
+                    log.debug("当前已扫描：" + i + "周");
+
+                //查询数据库 看当前id 对应的状态
+                if(PublicUtil.getProcessStatusByOrderId(orderId)) {
+
+                    timer.cancel();
+
+                    String reportFilePath = "";
+                    startSceneImage(reportFilePath);
+                }
+
+                //如果超过四次没通过 停止
+                if(i == 4) {
+                    timer.cancel();
+//					if(log.isDebugEnabled())
+//						log.debug(TimeUtil.getCurDate() + ":" + processParam + "生产时间超，时定制器强制停止");
+                }
+
+                i++;
+
+            }
+            // 0：延迟次数 即从开启到执行第一次扫描的时间  period：周期 多久扫描一次
+        }, 0, 3000);
 
 
         return true;

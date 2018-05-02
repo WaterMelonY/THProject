@@ -3,31 +3,26 @@ package util;
 import org.apache.log4j.Logger;
 import org.dom4j.Document;
 import org.dom4j.DocumentException;
-import org.dom4j.DocumentHelper;
-import org.dom4j.Element;
 import org.dom4j.io.OutputFormat;
 import org.dom4j.io.SAXReader;
 import org.dom4j.io.XMLWriter;
+import process.ProcessXmlCreate;
+import redis.clients.jedis.Jedis;
 
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Unmarshaller;
 import java.io.*;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
+import java.util.*;
 
 /**
  * Created by WaterMelon on 2018/4/20.
  * 各类公共方法类
  */
 public class PublicUtil {
+    private static Logger log = Logger.getLogger(PublicUtil.class);
     /**
      * 获取指定格式的当前系统时间
      *
@@ -269,4 +264,41 @@ public class PublicUtil {
         return document;
     }
 
+    public static void timerLinster(String orderId,String orderName){
+        Timer timer = new Timer();
+        timer.schedule(new TimerTask() {
+
+            int i = 1;
+
+            @Override
+            public void run() {
+
+                if(log.isInfoEnabled())
+                    log.info("当前已扫描：" + i + "周");
+
+                //查询数据库 看当前id 对应的状态
+                if(PublicUtil.getProcessStatusByOrderId(orderId)) {
+                    timer.cancel();
+                    String reportFilePath = "";
+                    if("THSegmentProcess".equals(orderName)){
+                        ProcessXmlCreate.createSceneOrder(reportFilePath);
+                    }else if("THSceneProcess".equals(orderName)){
+                        ProcessXmlCreate.createSceneImageOrder(reportFilePath);
+                    }
+                }
+
+                //如果超过四次没通过 停止
+                if(i == 4) {
+                    timer.cancel();
+					if(log.isDebugEnabled())
+						log.debug(TimeUtil.getCurDate() + ":" + orderId + "生产时间超，时定制器强制停止");
+                }
+
+                i++;
+
+            }
+            // 0：延迟次数 即从开启到执行第一次扫描的时间  period：周期 多久扫描一次
+        }, 0, 3000);
+
+    }
 }

@@ -8,6 +8,7 @@ import org.dom4j.Element;
 import redis.clients.jedis.Jedis;
 import util.PublicUtil;
 import util.RedisUtil;
+import util.TimeUtil;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -53,8 +54,10 @@ public class processFirst {
 //        inputfilelist.setText("testInputfilelist");
 
         Element outputfilelist = task.addElement("outputfilelist");
-        outputfilelist.addAttribute("num","2").addElement("reportFile").setText("/DiskArray/iecas/root/dpps/meta/2018/0427/"+taskId+".report.xml");
-        outputfilelist.addElement("resultFile").setText("/DiskArray/iecas/root/dpps/meta/2018/0427/"+taskId+".result.xml");
+        String year = TimeUtil.getCurYear();
+        String month = TimeUtil.getCurMonth();
+        outputfilelist.addAttribute("num","2").addElement("reportFile").setText("/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+taskId+".report.xml");
+        outputfilelist.addElement("resultFile").setText("/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+taskId+".result.xml");
 //        outputfilelist.setText("");
 
         Element params = task.addElement("params");
