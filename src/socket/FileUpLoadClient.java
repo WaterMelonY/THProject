@@ -153,7 +153,9 @@ public class FileUpLoadClient extends Socket{
                         e1.printStackTrace();
                     }
                 try {
-                    client.close();
+                    if(client!=null){
+                        client.close();
+                    }
                 } catch (IOException e) {
                     logger.error("Socket客户端：11.关闭客户端异常");
                     e.printStackTrace();

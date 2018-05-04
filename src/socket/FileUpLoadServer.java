@@ -13,7 +13,9 @@ public class FileUpLoadServer extends ServerSocket {
 
     public static void main(String[] args) {
         try {
-            new FileUpLoadServer(8888).load();
+            FileUpLoadServer server = new FileUpLoadServer(8888);
+            server.load();
+            server.quit();
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -90,10 +92,10 @@ public class FileUpLoadServer extends ServerSocket {
             RandomAccessFile rantmpfile = null; //  操作类：随机读取
 
             try {
-                // 获取
-                dis = new DataInputStream(socket.getInputStream());
                 // 发送
                 dos = new DataOutputStream(socket.getOutputStream());
+                // 获取
+                dis = new DataInputStream(socket.getInputStream());
                 // 定义客户端传过来的文件名
                 String fileName = "";
                 while (fileName == "") {
@@ -173,6 +175,7 @@ public class FileUpLoadServer extends ServerSocket {
                         dis.close();
                     if (rantmpfile != null)
                         rantmpfile.close();
+                    if (socket.isConnected())
                     socket.close();
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -183,6 +186,7 @@ public class FileUpLoadServer extends ServerSocket {
                  */
                 //DoSomeThing dst = new DoSomeThing()
                 //dst.save(filePath);
+                quit();
             }
         }
     }

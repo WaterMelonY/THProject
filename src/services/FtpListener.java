@@ -82,18 +82,21 @@ public class FtpListener {
                                 //判断类型 是传输申请文件还是传输完毕文件
                                 if(file.isFile()&&file.getName().endsWith(".xml")){
                                     FileUpLoadServer fileUpLoadServer = null;
-                                    if(file.getName().indexOf("")!=-1){
-
+                                    if(file.getName().indexOf("1")!=-1){
+                                        System.out.println("开始传输文件");
                                         try {
                                             fileUpLoadServer = new FileUpLoadServer(8888);
                                             fileUpLoadServer.load();
                                         } catch (Exception e) {
                                             e.printStackTrace();
                                         }
-                                    }else if(file.getName().indexOf("")!=-1){
+                                    }else if(file.getName().indexOf("2")!=-1){
+                                        //将文件入库
+
                                         //因目前是文件传输会判断文件是否接收完毕，所以不在此处进行关闭socket 直接开启任务流程
-                                        //fileUpLoadServer.quit();
-                                        ProcessXmlCreate.createSegmentOrder(fileAllPath);
+                                        new Thread(()->{
+                                            ProcessXmlCreate.createSegmentOrder(fileAllPath);
+                                        });
                                     }else {
                                         System.out.println("非xml文件不做处理");
                                     }

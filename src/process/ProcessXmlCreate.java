@@ -2,7 +2,6 @@ package process;
 
 import org.dom4j.DocumentHelper;
 import org.dom4j.Element;
-import redis.clients.jedis.Jedis;
 
 import org.dom4j.Document;
 import util.PublicUtil;
@@ -27,24 +26,24 @@ public class ProcessXmlCreate {
 
         Document completeDoc = PublicUtil.readXml(completeFile);
         //将来用javabean来替换completeDoc
-
+        //获取卫星号statelliteId  跟踪接收计划编号trplanid 观测计划编号pbtaskid
+        //根据跟踪接收计划编号trplanid  从TrTaskCopyInfo查出 orbitid轨道号  sensorType传感器类型 接收站stationId
+        //文件路径---本地ftp路劲   dat文件名称---？？？如何获取
+        //segmentIDPrefix 命名规则？？？  segmentDirRoot？？路径规则   server_address  server_port？？这两值如何填充
         String processName = "THSegmentProcess";
         String taskName = "THSegmentData";
         Date date = new Date();
         SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMddhhmmss");
         String time = dateFormat.format(date);
-
         Document doc = DocumentHelper.createDocument();
-
         String orderId = processName+time;
         String taskId = taskName+time;
-
         //填充模板内容
-        Element root = doc.addElement("process-order").addAttribute("id", processName+time).addAttribute("name", processName)
+        Element root = doc.addElement("process-order").addAttribute("id", orderId).addAttribute("name", processName)
                 .addAttribute("priority", "1");
 
         Element task = root.addElement("task");
-        task.addAttribute("orderid",processName+time);
+        task.addAttribute("orderid",orderId);
         task.addAttribute("priority","1");
         task.addAttribute("id",taskName+time);
         task.addAttribute("name",taskName);
@@ -56,8 +55,11 @@ public class ProcessXmlCreate {
         Element outputfilelist = task.addElement("outputfilelist");
         String year = TimeUtil.getCurYear();
         String month = TimeUtil.getCurMonth();
-        outputfilelist.addAttribute("num","2").addElement("reportFile").setText("/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+taskId+".report.xml");
-        outputfilelist.addElement("resultFile").setText("/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+taskId+".result.xml");
+        String reportFilePath = "/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+taskId+".report.xml";
+        String resultFile = "/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+taskId+".result.xml";
+
+        outputfilelist.addAttribute("num","2").addElement("reportFile").setText(reportFilePath);
+        outputfilelist.addElement("resultFile").setText(resultFile);
 //        outputfilelist.setText("");
 
         Element params = task.addElement("params");
@@ -71,12 +73,17 @@ public class ProcessXmlCreate {
         params.addElement("server_address").setText("127.0.0.1");
         params.addElement("server_port").setText("11111");
 
-        //此行代码为了测试 正式发布注释掉
+        //正式发布是否需要保存在本地一份？？
         PublicUtil.outputXml(doc,"D:\\CH\\testXml\\Process\\"+taskId+".xml");
         //提交到redis中。
         RedisUtil.submit(doc.asXML());
         //开启监听
-        PublicUtil.timerLinster(taskId,taskName);
+        boolean isSuccess =  PublicUtil.timerLinster(taskId);
+
+        //后续更改成对象的方式。直接传入对象，这样可以直接获取相对应的值。
+        if(isSuccess){
+            ProcessXmlCreate.createSceneOrder(reportFilePath);
+        }
     }
     //————————————————数据分段--------------------------------------------------End------------------------------
 
@@ -91,23 +98,25 @@ public class ProcessXmlCreate {
         for (Iterator it = segments.iterator(); it.hasNext();) {
             Element segment = (Element) it.next();
             String status = segment.element("status").getStringValue();
+            final boolean[] flag = new  boolean[1];
             if("SUCCESS".equals(status.toUpperCase())){
                 Date date = new Date();
                 SimpleDateFormat dateFormat = new SimpleDateFormat("yyyyMMddhhmmss");
                 String time = dateFormat.format(date);
-                //拼接xml然后提交到redis //然后提交到redis中
-                new Thread(()->{
-                    createSceneDoc(document,time);
-                });
-                new Thread(()->{
-                    sceneXmlToData(document,time);
-                });
-
+                //应该传入segment的Element 现在为了测试传入doc后续更改
+                String reportFilePath1 = createSceneDoc(document,time);
+                flag[0] = sceneXmlToData(document,time);
+                if(flag[0]&&flag[1]){
+                    //开启景浏览图生成
+                    createSceneImageOrder(reportFilePath1);
+                }
             }
+
         }
     }
 
-    public static void createSceneDoc(Document document,String time){
+    public static String createSceneDoc(Document document,String time){
+        //从document中获取  segmentDirRoot 和 segments中成功的ID
         String processName = "THSceneProcess";
         String taskName = "THSceneOrder";
 
@@ -133,7 +142,8 @@ public class ProcessXmlCreate {
         Element outputfilelist = task.addElement("outputfilelist");
         String year = TimeUtil.getCurYear();
         String month = TimeUtil.getCurMonth();
-        outputfilelist.addAttribute("num","2").addElement("reportFile").setText("/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+task+"/"+taskId+".report.xml");
+        String reportFilePath = "/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+task+"/"+taskId+".report.xml";
+        outputfilelist.addAttribute("num","2").addElement("reportFile").setText(reportFilePath);
         outputfilelist.addElement("resultFile").setText("/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+task+"/"+taskId+".result.xml");
 //        outputfilelist.setText("");
 
@@ -149,10 +159,13 @@ public class ProcessXmlCreate {
         params.addElement("server_port").setText("11111");
 
         RedisUtil.submit(doc.asXML());
-        PublicUtil.timerLinster(taskId,taskName);
+        if(!PublicUtil.timerLinster(taskId)){
+            reportFilePath = "";
+        }
+        return  reportFilePath;
     }
 
-    public static void sceneXmlToData(Document document,String time){
+    public static boolean sceneXmlToData(Document document,String time){
         String processName = "THSceneProcess";
         String taskName = "THSceneOrder";
 
@@ -196,7 +209,7 @@ public class ProcessXmlCreate {
 
         RedisUtil.submit(doc.asXML());
         //开启监听
-        PublicUtil.timerLinster(taskId,taskName);
+        return PublicUtil.timerLinster(taskId);
     }
 
     //-----------------------------------------------段分景处理------------------------------End------------------------------
@@ -230,7 +243,8 @@ public class ProcessXmlCreate {
                 new Thread(()->{
                     sceneImageXmlToData(document,time);
                 });
-
+                //发送编目完成通知
+                //调用1A产品生产。
             }
         }
     }
@@ -278,7 +292,7 @@ public class ProcessXmlCreate {
 
         RedisUtil.submit(doc.asXML());
 
-        PublicUtil.timerLinster(taskId,taskName);
+        PublicUtil.timerLinster(taskId);
     }
 
     public static void sceneImageXmlToData(Document document,String time){
@@ -325,7 +339,7 @@ public class ProcessXmlCreate {
 
         RedisUtil.submit(doc.asXML());
 
-        PublicUtil.timerLinster(taskId,taskName);
+        PublicUtil.timerLinster(taskId);
     }
     //-----------------------------------------------景图像生成------------------------------End------------------------------
 }

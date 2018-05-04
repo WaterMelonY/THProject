@@ -16,6 +16,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Created by WaterMelon on 2018/4/20.
@@ -264,7 +267,11 @@ public class PublicUtil {
         return document;
     }
 
-    public static void timerLinster(String orderId,String orderName){
+    public static boolean timerLinster(String orderId){
+        final boolean[] flag = new boolean[2];
+        flag[0] = false;
+        //使用计数器进行监控 如果循环次数过多可能会耗时。
+        final CountDownLatch latch = new CountDownLatch(1);
         Timer timer = new Timer();
         timer.schedule(new TimerTask() {
 
@@ -279,26 +286,27 @@ public class PublicUtil {
                 //查询数据库 看当前id 对应的状态
                 if(PublicUtil.getProcessStatusByOrderId(orderId)) {
                     timer.cancel();
-                    String reportFilePath = "";
-                    if("THSegmentProcess".equals(orderName)){
-                        ProcessXmlCreate.createSceneOrder(reportFilePath);
-                    }else if("THSceneProcess".equals(orderName)){
-                        ProcessXmlCreate.createSceneImageOrder(reportFilePath);
-                    }
+                    flag[0] = true;
+                    latch.countDown();
                 }
-
                 //如果超过四次没通过 停止
                 if(i == 4) {
                     timer.cancel();
+                    latch.countDown();
 					if(log.isDebugEnabled())
 						log.debug(TimeUtil.getCurDate() + ":" + orderId + "生产时间超，时定制器强制停止");
                 }
-
                 i++;
-
             }
             // 0：延迟次数 即从开启到执行第一次扫描的时间  period：周期 多久扫描一次
         }, 0, 3000);
-
+        try {
+            latch.await();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+            log.debug(e);
+        }
+        return flag[0];
     }
+
 }

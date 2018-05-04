@@ -35,16 +35,16 @@ public class SocketTest {
 //        filePaths.add("");
 //        snedFiles(filePaths);
 
-        sendfile("");
-        sendfile("");
-        sendfile("");
+        sendfile("D:\\linux\\[红帽企业Linux.6.4.服务器版].rhel-server-6.4-x86_64-dvd[ED2000.COM].iso");
+//        sendfile("");
+//        sendfile("");
     }
 
     public static void sendfile(String filePath){
         FileUpLoadClient client = null;
         try {
             client = new FileUpLoadClient("172.24.10.210",8888);
-            client.statusInfo();
+//            client.statusInfo();
             client.sendFile(filePath);
         } catch (IOException e) {
             e.printStackTrace();
