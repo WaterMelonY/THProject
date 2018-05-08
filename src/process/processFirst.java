@@ -55,7 +55,7 @@ public class processFirst {
 
         Element outputfilelist = task.addElement("outputfilelist");
         String year = TimeUtil.getCurYear();
-        String month = TimeUtil.getCurMonth();
+        String month = TimeUtil.getCurNyDate();
         outputfilelist.addAttribute("num","2").addElement("reportFile").setText("/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+taskId+".report.xml");
         outputfilelist.addElement("resultFile").setText("/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+taskId+".result.xml");
 //        outputfilelist.setText("");
@@ -102,7 +102,7 @@ public class processFirst {
                     String reportFilePath = "";
                     //开启下一个流程 ， 代码后期优化，使用递归模式进行调用。
 //                    startSenceProcess(reportFilePath);
-                    new processSecond().createSceneOrder(reportFilePath);
+//                    new processSecond().createSceneOrder(reportFilePath);
 //                    System.out.println("我要开启下一个流程");
                 }
 

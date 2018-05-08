@@ -1,10 +1,18 @@
 package services;
 
+import bean.ProcessBean;
+import bean.finsh.xsd.FinshInterfaceFile;
 import process.ProcessXmlCreate;
 import socket.FileUpLoadServer;
+import util.XmlToBean;
 
+import javax.xml.bind.annotation.XmlElement;
+import javax.xml.bind.annotation.XmlElements;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.file.*;
 import java.util.List;
 
@@ -85,6 +93,7 @@ public class FtpListener {
                                     if(file.getName().indexOf("1")!=-1){
                                         System.out.println("开始传输文件");
                                         try {
+                                            //传输申请文件入库
                                             fileUpLoadServer = new FileUpLoadServer(8888);
                                             fileUpLoadServer.load();
                                         } catch (Exception e) {
@@ -92,10 +101,14 @@ public class FtpListener {
                                         }
                                     }else if(file.getName().indexOf("2")!=-1){
                                         //将文件入库
-
-                                        //因目前是文件传输会判断文件是否接收完毕，所以不在此处进行关闭socket 直接开启任务流程
+                                        ProcessBean processBean = new ProcessBean();
+                                        FinshInterfaceFile finshInterfaceFile = new XmlToBean<FinshInterfaceFile>(new FinshInterfaceFile()).getObjByOrderName(file);
+                                        processBean.setFinshInterfaceFile(finshInterfaceFile);
+                                        //从数据库中查询出传输申请
+                                        //将传输申请和传输完成通知赋值给processBean
+                                        //因目前是文件传输会判断文件是否接收完毕，所以不在此处进行关闭socket 如果传输文件返回的是success直接开启任务流程
                                         new Thread(()->{
-                                            ProcessXmlCreate.createSegmentOrder(fileAllPath);
+                                            ProcessXmlCreate.createSegmentOrder(processBean);
                                         });
                                     }else {
                                         System.out.println("非xml文件不做处理");
@@ -124,6 +137,36 @@ public class FtpListener {
     }
 
     public static void main(String args[]) throws IOException, InterruptedException {
-        new FtpListener(Paths.get("D:\\FTP")).handleEvents();
+        File file = new File("C:\\Users\\WaterMelon\\Desktop\\xmlFile\\finsh.xml");
+        FinshInterfaceFile finshInterfaceFile = new XmlToBean<FinshInterfaceFile>(new FinshInterfaceFile()).getObjByOrderName(file);
+        List<Object> a = finshInterfaceFile.getFileHeadOrFileBody();
+
+//        FinshInterfaceFile.FileHead fileHead = (FinshInterfaceFile.FileHead)a.get(0);
+//        FinshInterfaceFile.FileBody fileBody = (FinshInterfaceFile.FileBody)a.get(1);
+//        System.out.println(fileBody.getTrPlanID());
+//        System.out.println(fileHead.getCreationTime());
+        Field[] fields = finshInterfaceFile.getClass().getDeclaredFields();
+        for (Field field: fields) {
+            System.out.println(field);
+            String fieldType = field.getAnnotatedType().getType().getTypeName();
+
+            System.out.println(fieldType);
+            if(fieldType.indexOf("java.util.List")!=-1){
+                System.out.println("islist");
+                //获取字段上的注解
+                boolean fieldHasAnno = field.isAnnotationPresent(XmlElements.class);
+                if(fieldHasAnno){
+                    XmlElements xmlElements = field.getAnnotation(XmlElements.class);
+                    //输出注解属性
+                    XmlElement[] xmlElements1 = xmlElements.value();
+                    for (XmlElement xmlElement : xmlElements1){
+                        String name = xmlElement.name();
+                        Class type = xmlElement.type();
+                        System.out.println(field.getName() + " name = " + name + ", type = " + type);
+                    }
+                }
+            }
+        }
+
     }
 }

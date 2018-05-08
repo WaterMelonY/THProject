@@ -9,9 +9,7 @@ import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 import javax.xml.parsers.SAXParser;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.StringWriter;
+import java.io.*;
 
 /**
  * Created by WaterMelon on 2018/4/27.
@@ -41,6 +39,20 @@ public class XmlToBean<T> {
         }
         return (T)a;
     }
+
+    public T getObjByOrderName(File file){
+        JAXBContext jaxbContext = null;
+        Object a= null;
+        try {
+            jaxbContext = JAXBContext.newInstance(var.getClass());
+            Unmarshaller jaxbUnmarshaller = jaxbContext.createUnmarshaller();
+            a = jaxbUnmarshaller.unmarshal(file);
+        } catch (JAXBException e) {
+            e.printStackTrace();
+        }
+        return (T)a;
+    }
+
 
     /**
      * JavaBean转换成xml 默认utf-8

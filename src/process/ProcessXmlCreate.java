@@ -1,5 +1,8 @@
 package process;
 
+import bean.ProcessBean;
+import bean.finsh.xsd.FinshInterfaceFile;
+import bean.标准图像产品生产订单.xsd.ProductProcessOrder;
 import org.dom4j.DocumentHelper;
 import org.dom4j.Element;
 
@@ -7,6 +10,7 @@ import org.dom4j.Document;
 import util.PublicUtil;
 import util.RedisUtil;
 import util.TimeUtil;
+import util.XmlToBean;
 
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -22,10 +26,14 @@ import java.util.List;
 public class ProcessXmlCreate {
 
     //————————————————数据分段--------------------------------------------------Start---------------
-    public static void createSegmentOrder(String completeFile){
+    public static void createSegmentOrder(ProcessBean processBean){
 
-        Document completeDoc = PublicUtil.readXml(completeFile);
-        //将来用javabean来替换completeDoc
+        List<Object> fileHeadOrFileBody = processBean.getFinshInterfaceFile().getFileHeadOrFileBody();
+        FinshInterfaceFile.FileHead fileHead = (FinshInterfaceFile.FileHead)fileHeadOrFileBody.get(0);
+        FinshInterfaceFile.FileBody fileBody = (FinshInterfaceFile.FileBody)fileHeadOrFileBody.get(1);
+        String trpalnId = fileBody.getTrPlanID();
+        //根据传输计划完成xml中的trplanID 查出申请的数据。
+
         //获取卫星号statelliteId  跟踪接收计划编号trplanid 观测计划编号pbtaskid
         //根据跟踪接收计划编号trplanid  从TrTaskCopyInfo查出 orbitid轨道号  sensorType传感器类型 接收站stationId
         //文件路径---本地ftp路劲   dat文件名称---？？？如何获取
@@ -49,12 +57,12 @@ public class ProcessXmlCreate {
         task.addAttribute("name",taskName);
 
         Element inputfilelist = task.addElement("inputfilelist");
-        inputfilelist.addAttribute("num","1").addElement("l0Data").setText("test10Data");
+        inputfilelist.addAttribute("num","1").addElement("l0Data").setText("");//自己命名
 //        inputfilelist.setText("testInputfilelist");
 
         Element outputfilelist = task.addElement("outputfilelist");
         String year = TimeUtil.getCurYear();
-        String month = TimeUtil.getCurMonth();
+        String month = TimeUtil.getCurNyDate();
         String reportFilePath = "/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+taskId+".report.xml";
         String resultFile = "/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+taskId+".result.xml";
 
@@ -63,12 +71,12 @@ public class ProcessXmlCreate {
 //        outputfilelist.setText("");
 
         Element params = task.addElement("params");
-        params.addElement("satelliteId").setText("JB13A-1");
-        params.addElement("stationID").setText("1111");
-        params.addElement("trplanid").setText("1111");
-        params.addElement("pbtaskid").setText("1111");
-        params.addElement("sensor").setText("SAT");
-        params.addElement("segmentIDPrefix").setText("JB13A-1_SAR_000000368");
+        params.addElement("satelliteId").setText("JB13A-1");//数据传输申请中的statellite
+        params.addElement("stationID").setText("1111");//数据传输申请中的receivingStation
+        params.addElement("trplanid").setText("1111");//trPlanID
+        params.addElement("pbtaskid").setText("1111");//数据传输申请中的pbTaskID
+        params.addElement("sensor").setText("SAT");//数据传输申请中的sensorID
+        params.addElement("segmentIDPrefix").setText("");//JB13A-1_SAR   statellite+ _ + sensorID
         params.addElement("segmentDirRoot").setText("/DiskArray/iecas/root/Output/BM/ZY3-02/BM_4656_Product/ZY3/MUX/");
         params.addElement("server_address").setText("127.0.0.1");
         params.addElement("server_port").setText("11111");
@@ -79,6 +87,7 @@ public class ProcessXmlCreate {
         RedisUtil.submit(doc.asXML());
         //开启监听
         boolean isSuccess =  PublicUtil.timerLinster(taskId);
+        //更新orderInfo信息by orderId---process-order id
 
         //后续更改成对象的方式。直接传入对象，这样可以直接获取相对应的值。
         if(isSuccess){
@@ -106,7 +115,7 @@ public class ProcessXmlCreate {
                 //应该传入segment的Element 现在为了测试传入doc后续更改
                 String reportFilePath1 = createSceneDoc(document,time);
                 flag[0] = sceneXmlToData(document,time);
-                if(flag[0]&&flag[1]){
+                if(flag[0]){
                     //开启景浏览图生成
                     createSceneImageOrder(reportFilePath1);
                 }
@@ -136,27 +145,31 @@ public class ProcessXmlCreate {
         task.addAttribute("name",taskName);
 
         Element inputfilelist = task.addElement("inputfilelist");
-        inputfilelist.addAttribute("num","1").addElement("10Data").setText("");
-        inputfilelist.setText("");
+        inputfilelist.addAttribute("num","1");
+        inputfilelist.addElement("segmentData").setText("");//数据分段报告segmentDirRoot + /segments-segment-id+/segments-segment-id.然后拼接文件名
+        inputfilelist.addElement("segmentXML").setText("");
+        inputfilelist.addElement("GPS").setText("");
+        inputfilelist.addElement("ATT_OULER").setText("");
+        inputfilelist.addElement("ATT_FOUR").setText("");
+        inputfilelist.addElement("EPHM").setText("");
 
         Element outputfilelist = task.addElement("outputfilelist");
         String year = TimeUtil.getCurYear();
-        String month = TimeUtil.getCurMonth();
+        String month = TimeUtil.getCurNyDate();
         String reportFilePath = "/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+task+"/"+taskId+".report.xml";
         outputfilelist.addAttribute("num","2").addElement("reportFile").setText(reportFilePath);
         outputfilelist.addElement("resultFile").setText("/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+task+"/"+taskId+".result.xml");
 //        outputfilelist.setText("");
 
         Element params = task.addElement("params");
-        params.addElement("satelliteId").setText("JB13A-1");
-        params.addElement("stationID").setText("1111");
-        params.addElement("trplanid").setText("1111");
-        params.addElement("pbtaskid").setText("1111");
-        params.addElement("sensor").setText("SAT");
-        params.addElement("segmentIDPrefix").setText("JB13A-1_SAR_000000368");
-        params.addElement("segmentDirRoot").setText("D:\\ThFileSave\\JB13A-1\\2015\\0729\\");
-        params.addElement("server_address").setText("127.0.0.1");
-        params.addElement("server_port").setText("11111");
+        params.addElement("satelliteId").setText("JB13A-1");//数据传输申请中的statellite
+//        params.addElement("stationID").setText("1111");
+        params.addElement("trplanid").setText("1111");//传输申请trplanid
+        params.addElement("pbtaskid").setText("1111");//传输申请pbtaskid
+        params.addElement("sensor").setText("SAT");////数据传输申请中的sensorID
+        params.addElement("segmentID").setText("");//segments-segment-id
+        params.addElement("imagingMode").setText("");//？？？
+        params.addElement("segmentDir").setText("");//segmentDirRoot+ segments-segment-id
 
         RedisUtil.submit(doc.asXML());
         if(!PublicUtil.timerLinster(taskId)){
@@ -186,7 +199,7 @@ public class ProcessXmlCreate {
         Element outputfilelist = task.addElement("outputfilelist").addAttribute("num","1");
         Element params = task.addElement("params");
 
-        Element segmentmetafile = inputfilelist.addElement("segmentmetafile");
+        Element segmentmetafile = inputfilelist.addElement("segmentmetafile");//report中的segmentDirRoot
         segmentmetafile.setText("");
 
         Element sendfin = inputfilelist.addElement("sendfin");
@@ -269,12 +282,12 @@ public class ProcessXmlCreate {
         task.addAttribute("name",taskName);
 
         Element inputfilelist = task.addElement("inputfilelist");
-        inputfilelist.addAttribute("num","1").addElement("10Data").setText("");
+        inputfilelist.addAttribute("num","5");
         inputfilelist.setText("");
 
         Element outputfilelist = task.addElement("outputfilelist");
         String year = TimeUtil.getCurYear();
-        String month = TimeUtil.getCurMonth();
+        String month = TimeUtil.getCurNyDate();
         outputfilelist.addAttribute("num","2").addElement("reportFile").setText("/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+task+"/"+taskId+".report.xml");
         outputfilelist.addElement("resultFile").setText("/DiskArray/iecas/root/dpps/meta/"+ year+"/"+month+"/"+task+"/"+taskId+".result.xml");
 //        outputfilelist.setText("");
@@ -339,7 +352,111 @@ public class ProcessXmlCreate {
 
         RedisUtil.submit(doc.asXML());
 
-        PublicUtil.timerLinster(taskId);
+        boolean isSuccess = PublicUtil.timerLinster(taskId);
+        if(isSuccess){
+            //先发送编目完成通知
+            //发送编目归档通知
+            //生产1A产品
+        }
     }
     //-----------------------------------------------景图像生成------------------------------End------------------------------
+
+    //-----------------------------------------------1A产品生产-----------------------------Start-----------------------------
+    public static void createProduct(){
+        //生产产品根据等级来生成 系统自动生成1A级产品
+        ProductProcessOrder processOrder = new ProductProcessOrder();
+        //填充文件头
+        processOrder.setId("");
+        processOrder.setName("");
+        processOrder.setPriority("");
+
+        List<ProductProcessOrder.Task> listTask = processOrder.getTask();
+        ProductProcessOrder.Task task = new ProductProcessOrder.Task();
+        task.setDesc("");
+        task.setId("");
+        task.setName("");
+        task.setOrderid("");
+
+        List<ProductProcessOrder.Task.Inputfilelist> inputfilelists = task.getInputfilelist();
+        ProductProcessOrder.Task.Inputfilelist inputfilelist = new ProductProcessOrder.Task.Inputfilelist();
+        inputfilelist.setNum("");
+        List<ProductProcessOrder.Task.Inputfilelist.MasterScene> masterScenes = inputfilelist.getMasterScene();
+        ProductProcessOrder.Task.Inputfilelist.MasterScene masterScene = new ProductProcessOrder.Task.Inputfilelist.MasterScene();
+        masterScene.setATTFOUR("");
+        masterScene.setATTOULER("");
+        masterScene.setEPHM("");
+        masterScene.setGPS("");
+        masterScene.setRawData("");
+        masterScene.setSceneXML("");
+        masterScene.setSegmentXML("");
+        masterScenes.add(masterScene);
+        inputfilelists.add(inputfilelist);
+
+        List<ProductProcessOrder.Task.Outputfilelist> outputfilelists = task.getOutputfilelist();
+        ProductProcessOrder.Task.Outputfilelist outputfilelist = new ProductProcessOrder.Task.Outputfilelist();
+        outputfilelist.setBrowseFile("");
+        outputfilelist.setMetaFile("");
+        outputfilelist.setNum("");
+        outputfilelist.setProdFile("");
+        outputfilelist.setResultFile("");
+        outputfilelist.setThumbFile("");
+        outputfilelists.add(outputfilelist);
+
+        List<ProductProcessOrder.Task.Params> params = task.getParams();
+        ProductProcessOrder.Task.Params param = new ProductProcessOrder.Task.Params();
+        param.setOutputType("");
+        param.setProdEndTime("");
+        param.setProdlevel("");
+        param.setProdStartTime("");
+        param.setProductId("");
+        param.setSatelliteId("");
+        param.setSceneid("");
+        param.setSceneshift("");
+        param.setSensor("");
+        param.setTaskType("");
+        List<ProductProcessOrder.Task.Params.ProdParams> prodParams = param.getProdParams();
+        ProductProcessOrder.Task.Params.ProdParams prodParam = new ProductProcessOrder.Task.Params.ProdParams();
+        prodParam.setAzimuthAmbiguitySuppress("");
+        prodParam.setAzimuthWindow("");
+        prodParam.setAzimuthWindowType("");
+        prodParam.setCompressChirpType("");
+        prodParam.setDoCDE("");
+        prodParam.setDoMapDrift("");
+        prodParam.setDoPGA("");
+        prodParam.setEarthModel("");
+        prodParam.setEchoDataDeCodeMethod("");
+        prodParam.setInterferSuppress("");
+        prodParam.setMultiLookAzimuth("");
+        prodParam.setMultiLookRange("");
+        prodParam.setProjectModel("");
+        prodParam.setQualifyModel("");
+        prodParam.setRadiometricModel("");
+        prodParam.setRangeWindow("");
+        prodParam.setRangeWindowType("");
+        prodParam.setSideLobeSuppress("");
+        prodParam.setSpeckleSuppress("");
+        prodParams.add(prodParam);
+
+        listTask.add(task);
+        String docXml = XmlToBean.convertToXml(processOrder);
+        RedisUtil.submit(docXml);
+        boolean isSuccess = PublicUtil.timerLinster(processOrder.getId());
+        if (isSuccess){
+            //1A完成之后 调用webservice 通知1A产品生产完成等待返回结果
+            //调用webservice 1A产品归档通知
+        }
+    }
+
+    //生产完成通知
+    public static Document createDocToFinsh(){
+        Document doc = null;
+        return  doc;
+    }
+
+    //生产入库通知
+    public static Document createDocToData(){
+        Document doc = null;
+        return doc;
+    }
+    //-----------------------------------------------1A产品生产-----------------------------End-------------------------------
 }
